@@ -1,4 +1,4 @@
-# Argus / SARGuard
+# Argus - SARGuard
 
 Argus is an offline Search and Rescue drone AI demo built around SARGuard. It connects ArduPilot SITL on a laptop to Gemma running through `llama.cpp` on a Jetson Orin Nano. The bridge accepts English or Hindi mission commands, runs pre-flight checks, uploads MAVLink missions, processes simulated thermal detections, replans mid-flight, and generates a post-flight debrief.
 
