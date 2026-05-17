@@ -1,0 +1,10 @@
+{
+  "timestamp": "01:01 IST",
+  "status": "success",
+  "active_notams": [
+    "VIP Movement: Avoid airspace 5km radius around 9.4200, 76.5100 below 400ft between 1400-1600 IST",
+    "Paragliding Activity: Active sector 10km East of home point. Exercise caution."
+  ],
+  "zone_status": "Green",
+  "recommendation": "PROCEED WITH CAUTION. No critical restrictions in immediate operational area."
+}

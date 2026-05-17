@@ -163,6 +163,17 @@ def _demo_response(user_message: str) -> dict:
             "next_mission_recommendation": "Complete eastern zone after ground team clears civilians. Recommend 06:30 launch for calmer wind.",
             "overall_assessment": "SUCCESSFUL - Search pattern executed, one medium-confidence victim detection referred to ground team.",
         }
+    if "TELEMETRY ANOMALY:" in user_message:
+        return {
+            "anomaly_type": "ESC_OVERHEAT",
+            "severity": "CRITICAL",
+            "detected_value": "58C",
+            "threshold": "55C",
+            "recommended_action": "RTH",
+            "action_urgency": "IMMEDIATE",
+            "reason": "ESC temperature 58C exceeds critical threshold 55C. Continued flight risks ESC failure and motor loss. Autonomous RTH recommended.",
+            "operator_message": "ESC overheating. Land and inspect motor 2 before next flight."
+        }
     if "MISSION COMMAND:" in user_message:
         return {
             "decision": "go",

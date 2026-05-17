@@ -42,6 +42,12 @@ Flight mode: {flight_mode}
 Armed: {armed}
 Mission waypoint: {current_wp} of {total_wp}
 
+LIVE NOTAMS:
+{notam_info}
+
+SPATIAL CONTEXT (GeoJSON):
+{spatial_context}
+
 RESPONSE FORMAT RULES:
 - If given a mission command: respond ONLY with valid JSON (waypoints block)
 - If asked for pre-flight check: respond ONLY with preflight block
@@ -50,7 +56,7 @@ RESPONSE FORMAT RULES:
 - If asked for debrief: respond with debrief block
 - If mid-mission replan: respond with replan block
 - Never add explanatory prose outside the JSON block
-- Never hallucinate GPS coordinates. Use the home lat/lon as reference and calculate offsets in degrees (1 degree lat ~= 111km, 1 degree lon ~= 111km * cos(lat)).
+- Use the provided SPATIAL CONTEXT (GeoJSON) bounds when generating waypoints or avoidance paths. Do not hallucinate coordinates.
 """
 
 MISSION_COMMAND_INSTRUCTIONS = """
@@ -91,7 +97,7 @@ Run a complete pre-flight safety check and output EXACTLY this JSON, nothing els
     {"name": "ESC temperature", "value": "38C", "status": "PASS", "limit": "<55C", "note": ""},
     {"name": "GPS fix", "value": "3D fix, 9 satellites", "status": "PASS", "limit": ">6 satellites", "note": ""},
     {"name": "DGCA zone", "value": "Green", "status": "PASS", "limit": "Green or Yellow with permission", "note": ""},
-    {"name": "NOTAM", "value": "None active", "status": "PASS", "limit": "No active restrictions", "note": "Cached 14:15 IST"},
+    {"name": "NOTAM", "value": "Reflecting live NOTAM data", "status": "PASS", "limit": "No active restrictions", "note": ""},
     {"name": "Geofence", "value": "Loaded", "status": "PASS", "limit": "Must be loaded", "note": ""},
     {"name": "Motor balance", "value": "All within 0.3A", "status": "PASS", "limit": "<0.5A imbalance", "note": ""}
   ],

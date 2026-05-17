@@ -1,0 +1,43 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Northern Riverbank Search Zone",
+        "type": "search_area"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.5205, 9.4140],
+            [76.5225, 9.4140],
+            [76.5225, 9.4165],
+            [76.5205, 9.4165],
+            [76.5205, 9.4140]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Concrete Embankment",
+        "type": "obstacle_avoid"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.5200, 9.4150],
+            [76.5208, 9.4150],
+            [76.5208, 9.4160],
+            [76.5200, 9.4160],
+            [76.5200, 9.4150]
+          ]
+        ]
+      }
+    }
+  ]
+}

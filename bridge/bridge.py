@@ -4,6 +4,7 @@ import os
 import queue
 import sys
 import threading
+import time
 
 try:
     from dotenv import load_dotenv
@@ -18,12 +19,13 @@ from bridge.detection import format_detection_display, process_thermal_detection
 from bridge.gemma_client import call_gemma, check_gemma_health, parse_json_response
 from bridge.mission_uploader import land, rtl, upload_mission
 from bridge.preflight import format_preflight_display, run_preflight_check
-from bridge.prompts import MISSION_COMMAND_INSTRUCTIONS, REPLAN_PROMPT, SYSTEM_PROMPT_BASE
+from bridge.prompts import MISSION_COMMAND_INSTRUCTIONS, REPLAN_PROMPT, SYSTEM_PROMPT_BASE, ANOMALY_PROMPT
 from bridge.telemetry import (
     connect_sitl,
     get_state,
     start_sim_telemetry_threads,
     start_telemetry_threads,
+    update_context,
 )
 
 load_dotenv()
@@ -45,6 +47,59 @@ def process_mission_command(user_input: str) -> dict | None:
         console.print(f"[red]JSON parse error: {exc}[/red]")
         console.print(f"Raw response:\n{raw}")
         return None
+
+
+def load_context():
+    try:
+        geojson_path = os.path.join(os.path.dirname(__file__), "farm_map.geojson")
+        with open(geojson_path, "r") as f:
+            geojson_data = json.load(f)
+        spatial_ctx = json.dumps(geojson_data)
+    except Exception:
+        spatial_ctx = "None loaded"
+        
+    try:
+        notam_path = os.path.join(os.path.dirname(__file__), "notams_cache.json")
+        with open(notam_path, "r") as f:
+            notam_data = json.load(f)
+            active = ", ".join(notam_data.get("active_notams", [])) or "None active"
+            ts = notam_data.get("timestamp", "unknown time")
+            notam_info = f"{active} (Cached at {ts})"
+    except Exception:
+        notam_info = "None active (No cache found)"
+        
+    update_context(spatial_ctx, notam_info)
+
+def start_anomaly_monitor_thread():
+    def monitor_loop():
+        # Avoid rapid multiple alerts for the same condition
+        last_alert_time = 0
+        while True:
+            time.sleep(3)
+            state = get_state()
+            if not state.get("armed"):
+                continue
+            
+            # Simple threshold check for demo purposes
+            anomaly_detected = False
+            if state.get("esc_temp_c", 0) >= 55:
+                anomaly_detected = True
+                
+            if anomaly_detected and (time.time() - last_alert_time > 30):
+                last_alert_time = time.time()
+                system = SYSTEM_PROMPT_BASE.format(**state)
+                user = ANOMALY_PROMPT + "\n\nTELEMETRY ANOMALY:\nESC Overheating detected."
+                console.print("[yellow]\n[!] Anomaly detected. Querying Gemma for diagnosis...[/yellow]")
+                raw = call_gemma(system, user)
+                try:
+                    data = parse_json_response(raw)
+                    display = json.dumps(data, indent=2)
+                    console.print(f"[bold red]ANOMALY REPORT:[/bold red]\n{display}")
+                    update_overlay(display, "anomaly")
+                except Exception as exc:
+                    console.print(f"[red]Anomaly parse error: {exc}[/red]")
+
+    threading.Thread(target=monitor_loop, daemon=True).start()
 
 
 def process_replan(user_input: str) -> dict | None:
@@ -209,6 +264,9 @@ def main():
 
     if not args.no_overlay:
         start_overlay_server()
+
+    load_context()
+    start_anomaly_monitor_thread()
 
     console.print(
         Panel(

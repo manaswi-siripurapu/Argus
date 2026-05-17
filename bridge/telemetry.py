@@ -44,6 +44,8 @@ state = {
     "heading_deg": 0,
     "voltage_v": 16.8,
     "timestamp": time.time(),
+    "spatial_context": "None loaded",
+    "notam_info": "None active (No cache found)",
 }
 
 _lock = threading.Lock()
@@ -246,7 +248,7 @@ def _sim_loop():
                         state["flight_mode"] = "RTL"
                         state["altitude_m"] = max(0.0, state["altitude_m"] - 4.0)
                 state["battery_pct"] = max(22, state["battery_pct"] - 1)
-                state["esc_temp_c"] = min(48, state["esc_temp_c"] + (1 if state["armed"] else 0))
+                state["esc_temp_c"] = min(65, state["esc_temp_c"] + (1 if state["armed"] else 0))
                 state["motor1_a"] = round(4.3 + random.uniform(-0.2, 0.2), 2)
                 state["motor2_a"] = round(4.2 + random.uniform(-0.2, 0.2), 2)
                 state["motor3_a"] = round(4.4 + random.uniform(-0.2, 0.2), 2)
@@ -257,3 +259,8 @@ def _sim_loop():
 def get_state() -> dict:
     with _lock:
         return dict(state)
+
+def update_context(spatial: str, notam: str):
+    with _lock:
+        state["spatial_context"] = spatial
+        state["notam_info"] = notam

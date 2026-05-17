@@ -3,408 +3,556 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SARGuard Overlay</title>
+<title>SARGuard Drone Ground Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
+  :root {
+    --bg-dark: #020617;
+    --panel-bg: #0f172a;
+    --border: #1e293b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent: #0ea5e9;
+    --accent-hover: #38bdf8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: #0a0e1a;
-    color: #e2e8f0;
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-    padding: 16px;
-    min-height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
+  
+  /* Header */
   #header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid #1e293b;
-    padding-bottom: 12px;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
   }
-  #dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #22c55e;
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  #brand {
-    font-weight: bold;
-    font-size: 14px;
-    color: #e2e8f0;
-  }
-  #type-label {
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #64748b;
-  }
-  #type-value {
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    padding: 2px 8px;
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; }
+  .status-badge {
+    padding: 4px 10px;
     border-radius: 4px;
-  }
-  .type-idle { background:#1e293b; color:#94a3b8; }
-  .type-preflight { background:#1e3a5f; color:#60a5fa; }
-  .type-mission { background:#1a3a2a; color:#4ade80; }
-  .type-detection { background:#3b1a1a; color:#f87171; }
-  .type-replan { background:#3b2a0a; color:#fbbf24; }
-  .type-debrief { background:#2a1a3b; color:#a78bfa; }
-  .type-system { background:#1e293b; color:#94a3b8; }
-  #output-panel {
-    background: #0f172a;
-    border: 1px solid #1e293b;
-    border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 14px;
-    min-height: 200px;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.6;
-    color: #cbd5e1;
-    overflow-y: auto;
-    max-height: 55vh;
-  }
-  #command-panel {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  #command-input {
-    width: 100%;
-    min-height: 42px;
-    background: #020617;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    color: #e2e8f0;
-    font-family: inherit;
-    font-size: 13px;
-    padding: 10px 12px;
-    outline: none;
-  }
-  #command-input:focus {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
-  }
-  #send-command {
-    min-width: 92px;
-    background: #0ea5e9;
-    border: 1px solid #38bdf8;
-    border-radius: 6px;
-    color: #03121f;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: bold;
-    letter-spacing: 0.06em;
-    padding: 0 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
   }
-  #send-command:disabled {
-    cursor: wait;
-    opacity: 0.65;
+  .type-idle { background: #1e293b; color: #cbd5e1; }
+  .type-mission { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+  .type-anomaly, .type-detection { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); animation: pulse-danger 1s infinite; }
+  .type-replan { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+  
+  @keyframes pulse-danger {
+    0%, 100% { box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+    50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
   }
-  #quick-actions {
+
+  /* Main Layout */
+  #main-container {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
+    flex: 1;
+    height: calc(100vh - 53px);
   }
-  .quick-action {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    color: #cbd5e1;
-    cursor: pointer;
-    font-family: inherit;
+  
+  /* Sidebar */
+  #sidebar {
+    width: 280px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .sidebar-section {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .section-title {
     font-size: 12px;
-    font-weight: bold;
-    padding: 8px 10px;
+    color: var(--text-muted);
     text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
   }
-  .quick-action:hover,
-  #send-command:hover {
-    filter: brightness(1.12);
-  }
-  #mission-map {
-    position: relative;
-    height: 260px;
-    margin-bottom: 14px;
-    overflow: hidden;
-    border: 1px solid #1e293b;
-    border-radius: 8px;
-    background:
-      linear-gradient(90deg, rgba(14, 165, 233, 0.28) 0 32%, transparent 32%),
-      linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-      #0f172a;
-    background-size: auto, 40px 40px, 40px 40px, auto;
-  }
-  #mission-map::before {
-    content: "";
-    position: absolute;
-    left: 31%;
-    top: 0;
-    width: 7px;
-    height: 100%;
-    background: repeating-linear-gradient(
-      to bottom,
-      #94a3b8,
-      #94a3b8 10px,
-      #334155 10px,
-      #334155 18px
-    );
-    opacity: 0.85;
-  }
-  #mission-map::after {
-    content: "KUTTANAD FLOOD GRID";
-    position: absolute;
-    right: 12px;
-    bottom: 10px;
-    color: #475569;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-  }
-  .map-label {
-    position: absolute;
-    color: #94a3b8;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  #river-label { left: 16px; top: 14px; color: #7dd3fc; }
-  #embankment-label { left: 33%; top: 14px; color: #cbd5e1; }
-  .marker {
-    position: absolute;
-    transform: translate(-50%, -50%);
+  .telem-grid {
     display: grid;
-    place-items: center;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
-  #home-marker {
-    left: 48%;
-    top: 76%;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #4ade80;
-    background: #14532d;
-    border-radius: 50%;
-  }
-  #drone-marker {
-    left: 48%;
-    top: 76%;
-    width: 22px;
-    height: 22px;
-    color: #0f172a;
-    background: #f8fafc;
-    border: 2px solid #38bdf8;
-    border-radius: 50%;
-    font-weight: bold;
-    transition: left 600ms ease, top 600ms ease;
-  }
-  #detection-marker {
-    left: 62%;
-    top: 40%;
-    width: 18px;
-    height: 18px;
-    border: 2px solid #f87171;
-    background: #7f1d1d;
-    border-radius: 50%;
-    box-shadow: 0 0 18px rgba(248, 113, 113, 0.75);
-    display: none;
-  }
-  #telemetry {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .telem-card {
-    background: #0f172a;
-    border: 1px solid #1e293b;
+  .telem-item {
+    background: var(--bg-dark);
+    padding: 10px;
     border-radius: 6px;
-    padding: 8px 10px;
-    min-width: 0;
+    border: 1px solid var(--border);
   }
   .telem-label {
     font-size: 10px;
-    color: #64748b;
+    color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    margin-bottom: 4px;
   }
   .telem-value {
     font-size: 16px;
-    font-weight: bold;
-    margin-top: 2px;
-    overflow-wrap: anywhere;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
   }
-  .val-ok { color: #4ade80; }
-  .val-warn { color: #fbbf24; }
-  .val-crit { color: #f87171; }
-  #footer {
-    font-size: 10px;
-    color: #64748b;
-    text-align: right;
+  .val-ok { color: var(--success); }
+  .val-warn { color: var(--warning); }
+  .val-crit { color: var(--danger); }
+  
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
-  @media (max-width: 720px) {
-    #telemetry { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .btn-action {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: var(--text-main);
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
   }
+  .btn-action:hover { background: #334155; }
+  .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.3); }
+  .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+
+  /* Content Area */
+  #content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  /* Top Split View (Map & Camera) */
+  #visuals-container {
+    display: flex;
+    height: 55%;
+    gap: 16px;
+  }
+  
+  .visual-panel {
+    flex: 1;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel-bg);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  }
+  
+  .panel-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(4px);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    z-index: 1000;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  #map {
+    height: 100%;
+    width: 100%;
+    z-index: 1;
+  }
+  
+  /* Camera Feed Simulation */
+  #camera-feed {
+    height: 100%;
+    width: 100%;
+    background-image: url('/static/drone_camera_feed.png');
+    background-size: 120%;
+    background-position: center;
+    position: relative;
+    animation: pan-hover 20s infinite alternate ease-in-out;
+  }
+  @keyframes pan-hover {
+    0% { background-position: 48% 48%; }
+    50% { background-position: 52% 50%; }
+    100% { background-position: 50% 52%; }
+  }
+  .hud-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hud-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+  }
+  .hud-line { background: rgba(255, 255, 255, 0.6); position: absolute; }
+  .hud-v { width: 2px; height: 100%; left: 19px; }
+  .hud-h { width: 100%; height: 2px; top: 19px; }
+  
+  .hud-rec {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    color: #ef4444;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  }
+  .rec-dot {
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  
+  .hud-pitch {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 80px;
+    border-left: 2px solid rgba(255,255,255,0.4);
+    border-right: 2px solid rgba(255,255,255,0.4);
+  }
+  .hud-pitch::before, .hud-pitch::after {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 2px; background: rgba(255,255,255,0.6);
+  }
+  .hud-pitch::before { top: 20%; }
+  .hud-pitch::after { bottom: 20%; }
+
+  /* AI Terminal Area */
+  #terminal-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  #output-panel {
+    flex: 1;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #a5b4fc;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .prompt-prefix { color: #34d399; margin-right: 8px; }
+  
+  #command-form {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: var(--bg-dark);
+  }
+  #command-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 14px 16px;
+    color: var(--text-main);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    outline: none;
+  }
+  #send-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0 24px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  #send-btn:hover { background: var(--accent-hover); }
+
 </style>
 </head>
 <body>
+
 <div id="header">
-  <div id="dot"></div>
-  <span id="brand">SARGuard</span>
-  <span id="type-label">STATUS</span>
-  <span id="type-value" class="type-idle">IDLE</span>
+  <div class="header-left">
+    <div class="brand">Argus <span style="color:var(--text-muted);font-weight:400">| SARGuard OS</span></div>
+  </div>
+  <div id="type-value" class="status-badge type-idle">SYSTEM IDLE</div>
 </div>
 
-<form id="command-panel">
-  <input
-    id="command-input"
-    autocomplete="off"
-    value="Search northern riverbank, start at 50 metres, expanding square pattern, avoid the concrete embankment on the west side"
-  >
-  <button id="send-command" type="submit">Send</button>
-</form>
+<div id="main-container">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="section-title">Critical Telemetry</div>
+      <div class="telem-grid">
+        <div class="telem-item">
+          <div class="telem-label">Battery</div>
+          <div class="telem-value val-ok" id="t-bat">--%</div>
+        </div>
+        <div class="telem-item">
+          <div class="telem-label">Altitude</div>
+          <div class="telem-value val-ok" id="t-alt">--m</div>
+        </div>
+        <div class="telem-item">
+          <div class="telem-label">ESC Temp</div>
+          <div class="telem-value val-ok" id="t-esc">--C</div>
+        </div>
+        <div class="telem-item">
+          <div class="telem-label">Wind Spd</div>
+          <div class="telem-value val-ok" id="t-wind">-- km/h</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="sidebar-section">
+      <div class="section-title">Navigation</div>
+      <div class="telem-grid">
+        <div class="telem-item" style="grid-column: span 2">
+          <div class="telem-label">Flight Mode</div>
+          <div class="telem-value val-ok" id="t-mode">--</div>
+        </div>
+        <div class="telem-item">
+          <div class="telem-label">GPS Fix</div>
+          <div class="telem-value val-ok" id="t-gps">--</div>
+        </div>
+        <div class="telem-item">
+          <div class="telem-label">Armed</div>
+          <div class="telem-value val-ok" id="t-armed">--</div>
+        </div>
+        <div class="telem-item" style="grid-column: span 2">
+          <div class="telem-label">Waypoint Progress</div>
+          <div class="telem-value val-ok" id="t-wp">-- / --</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="sidebar-section" style="border-bottom:none">
+      <div class="section-title">Quick Actions</div>
+      <div class="controls-grid">
+        <button class="btn-action" onclick="sendCommand('preflight')">PREFLIGHT</button>
+        <button class="btn-action" onclick="sendCommand('detect')">DETECT</button>
+        <button class="btn-action" onclick="sendCommand('debrief')">DEBRIEF</button>
+        <button class="btn-action btn-danger" onclick="sendCommand('rtl')">FORCE RTL</button>
+      </div>
+    </div>
+  </div>
 
-<div id="quick-actions">
-  <button class="quick-action" type="button" data-command="preflight">Preflight</button>
-  <button class="quick-action" type="button" data-command="detect">Detect</button>
-  <button class="quick-action" type="button" data-command="Skip eastern zone, civilians on ground">Replan</button>
-  <button class="quick-action" type="button" data-command="rtl">RTL</button>
-  <button class="quick-action" type="button" data-command="debrief">Debrief</button>
+  <!-- Content Area -->
+  <div id="content">
+    
+    <!-- Top Visuals -->
+    <div id="visuals-container">
+      <!-- Map -->
+      <div class="visual-panel">
+        <div class="panel-badge">SATELLITE MAP</div>
+        <div id="map"></div>
+      </div>
+      
+      <!-- Camera Feed -->
+      <div class="visual-panel">
+        <div class="panel-badge">GIMBAL CAMERA (LIVE)</div>
+        <div id="camera-feed">
+          <div class="hud-overlay">
+            <div class="hud-rec"><div class="rec-dot"></div> REC</div>
+            <div class="hud-crosshair">
+              <div class="hud-line hud-v"></div>
+              <div class="hud-line hud-h"></div>
+            </div>
+            <div class="hud-pitch"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bottom AI Terminal -->
+    <div id="terminal-container">
+      <div id="output-panel">Initializing Argus AI Bridge... Waiting for operator input.</div>
+      <form id="command-form">
+        <input id="command-input" placeholder="Enter mission command (e.g. 'Search northern riverbank')" autocomplete="off" value="search northern riverbank">
+        <button type="submit" id="send-btn">EXECUTE</button>
+      </form>
+    </div>
+    
+  </div>
 </div>
 
-<div id="output-panel">Waiting for command...</div>
-
-<div id="mission-map">
-  <div class="map-label" id="river-label">Riverbank</div>
-  <div class="map-label" id="embankment-label">West embankment buffer</div>
-  <div class="marker" id="home-marker"></div>
-  <div class="marker" id="drone-marker">A</div>
-  <div class="marker" id="detection-marker"></div>
-</div>
-
-<div id="telemetry">
-  <div class="telem-card"><div class="telem-label">Battery</div><div class="telem-value val-ok" id="t-bat">--%</div></div>
-  <div class="telem-card"><div class="telem-label">Altitude</div><div class="telem-value val-ok" id="t-alt">--m</div></div>
-  <div class="telem-card"><div class="telem-label">ESC Temp</div><div class="telem-value val-ok" id="t-esc">--C</div></div>
-  <div class="telem-card"><div class="telem-label">Mode</div><div class="telem-value val-ok" id="t-mode">--</div></div>
-  <div class="telem-card"><div class="telem-label">GPS</div><div class="telem-value val-ok" id="t-gps">--</div></div>
-  <div class="telem-card"><div class="telem-label">Wind</div><div class="telem-value val-ok" id="t-wind">-- km/h</div></div>
-  <div class="telem-card"><div class="telem-label">Waypoint</div><div class="telem-value val-ok" id="t-wp">-- / --</div></div>
-  <div class="telem-card"><div class="telem-label">Armed</div><div class="telem-value val-ok" id="t-armed">--</div></div>
-</div>
-
-<div id="footer">Last update: --</div>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const POLL_INTERVAL = 500;
+// --- Map Initialization ---
 const HOME_LAT = 9.4142;
 const HOME_LON = 76.5213;
-const MAP_LAT_SPAN = 0.0032;
-const MAP_LON_SPAN = 0.0032;
-const commandForm = document.getElementById("command-panel");
-const commandInput = document.getElementById("command-input");
-const sendButton = document.getElementById("send-command");
 
-commandForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await sendCommand(commandInput.value);
+const map = L.map('map', {
+  zoomControl: false,
+  attributionControl: false
+}).setView([HOME_LAT, HOME_LON], 17);
+
+// Esri World Imagery (Realistic Satellite)
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19
+}).addTo(map);
+
+// Draw Search Zones from our GeoJSON spec
+const searchZone = L.polygon([
+  [9.4140, 76.5205],
+  [9.4140, 76.5225],
+  [9.4165, 76.5225],
+  [9.4165, 76.5205]
+], {color: '#38bdf8', weight: 2, fillOpacity: 0.1, dashArray: '5, 5'}).addTo(map);
+
+const embankment = L.polygon([
+  [9.4150, 76.5200],
+  [9.4150, 76.5208],
+  [9.4160, 76.5208],
+  [9.4160, 76.5200]
+], {color: '#f43f5e', weight: 2, fillOpacity: 0.2}).addTo(map);
+
+// Drone Marker
+const droneIcon = L.divIcon({
+  className: 'custom-drone-icon',
+  html: `<div style="width:20px;height:20px;background:#fff;border:3px solid #0ea5e9;border-radius:50%;box-shadow:0 0 10px rgba(14,165,233,0.8);"></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
 });
+const droneMarker = L.marker([HOME_LAT, HOME_LON], {icon: droneIcon}).addTo(map);
 
-document.querySelectorAll(".quick-action").forEach((button) => {
-  button.addEventListener("click", async () => {
-    const command = button.dataset.command || "";
-    commandInput.value = command;
-    await sendCommand(command);
-  });
+
+// --- Logic ---
+const POLL_INTERVAL = 500;
+let lastProcessedText = "";
+const outputPanel = document.getElementById("output-panel");
+const form = document.getElementById("command-form");
+const input = document.getElementById("command-input");
+const btn = document.getElementById("send-btn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await sendCommand(input.value);
 });
 
 async function sendCommand(command) {
   const text = (command || "").trim();
   if (!text) return;
-  sendButton.disabled = true;
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  
+  outputPanel.innerHTML += `\n<br><span class="prompt-prefix">Operator &gt;</span> ${text}\n`;
+  outputPanel.scrollTop = outputPanel.scrollHeight;
+  
   try {
-    const response = await fetch("/command", {
+    const res = await fetch("/command", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({command: text})
     });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      document.getElementById("output-panel").textContent = data.error || "Command rejected.";
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      outputPanel.innerHTML += `\nError: ${data.error || "Command rejected."}`;
     }
   } catch (error) {
-    document.getElementById("output-panel").textContent = "Cannot send command to SARGuard bridge.";
+    outputPanel.innerHTML += `\nNetwork error communicating with bridge.`;
   } finally {
-    sendButton.disabled = false;
-    commandInput.focus();
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    if(command !== 'preflight' && command !== 'detect' && command !== 'rtl' && command !== 'debrief') {
+       input.value = "";
+    }
   }
+}
+
+function setVal(id, val, cls) {
+  const el = document.getElementById(id);
+  if(el) { el.textContent = val; el.className = "telem-value " + cls; }
 }
 
 async function poll() {
   try {
-    const response = await fetch("/status");
-    const data = await response.json();
-    document.getElementById("output-panel").textContent = data.text || "";
+    const res = await fetch("/status");
+    const data = await res.json();
+    
+    // Update AI Output with Typewriter Effect
+    if (data.text && data.text !== lastProcessedText) {
+        lastProcessedText = data.text;
+        
+        const span = document.createElement('span');
+        span.style.color = '#cbd5e1';
+        outputPanel.appendChild(document.createElement('br'));
+        outputPanel.appendChild(document.createElement('br'));
+        outputPanel.appendChild(span);
+        
+        let i = 0;
+        function typeWriter() {
+          if (i < data.text.length) {
+            span.textContent += data.text.charAt(i);
+            i++;
+            outputPanel.scrollTop = outputPanel.scrollHeight;
+            setTimeout(typeWriter, 5);
+          }
+        }
+        typeWriter();
+    }
 
+    // Status Badge
     const typeValue = document.getElementById("type-value");
     const type = (data.type || "idle").toLowerCase();
-    typeValue.textContent = type.toUpperCase();
-    typeValue.className = "type-" + type;
+    typeValue.textContent = (type === "system" ? "MISSION" : type).toUpperCase();
+    typeValue.className = "status-badge type-" + type;
 
-    const battery = data.battery_pct ?? 0;
+    // Telemetry Update
+    const bat = data.battery_pct ?? 0;
     const esc = data.esc_temp_c ?? 0;
-    set("t-bat", battery + "%", battery > 40 ? "val-ok" : battery > 25 ? "val-warn" : "val-crit");
-    set("t-alt", (data.altitude_m ?? 0).toFixed(1) + "m", "val-ok");
-    set("t-esc", esc + "C", esc < 55 ? "val-ok" : esc < 70 ? "val-warn" : "val-crit");
-    set("t-mode", data.flight_mode || "--", "val-ok");
-    set("t-gps", data.gps_fix ? "3D FIX" : "NO FIX", data.gps_fix ? "val-ok" : "val-crit");
-    set("t-wind", (data.wind_speed ?? 0) + " km/h", data.wind_speed < 25 ? "val-ok" : data.wind_speed < 35 ? "val-warn" : "val-crit");
-    set("t-wp", (data.current_wp ?? 0) + " / " + (data.total_wp ?? 0), "val-ok");
-    set("t-armed", data.armed ? "ARMED" : "DISARMED", data.armed ? "val-warn" : "val-ok");
-    updateMap(data);
-    document.getElementById("footer").textContent = "Last update: " + new Date().toLocaleTimeString();
-  } catch (error) {
-    document.getElementById("output-panel").textContent =
-      "Cannot reach SARGuard bridge at localhost:5000\nMake sure bridge.py is running.";
+    const wind = data.wind_speed ?? 0;
+    
+    setVal("t-bat", bat + "%", bat > 40 ? "val-ok" : bat > 25 ? "val-warn" : "val-crit");
+    setVal("t-alt", (data.altitude_m ?? 0).toFixed(1) + "m", "val-ok");
+    setVal("t-esc", esc + "C", esc < 55 ? "val-ok" : esc < 70 ? "val-warn" : "val-crit");
+    setVal("t-wind", wind + " km/h", wind < 25 ? "val-ok" : wind < 35 ? "val-warn" : "val-crit");
+    
+    setVal("t-mode", data.flight_mode || "STABILIZE", "val-ok");
+    setVal("t-gps", data.gps_fix ? "3D FIX" : "NO FIX", data.gps_fix ? "val-ok" : "val-crit");
+    setVal("t-armed", data.armed ? "ARMED" : "DISARMED", data.armed ? "val-warn" : "val-ok");
+    setVal("t-wp", (data.current_wp ?? 0) + " / " + (data.total_wp ?? 0), "val-ok");
+
+    // Map Update
+    if (data.lat && data.lon) {
+      droneMarker.setLatLng([data.lat, data.lon]);
+    }
+
+  } catch (e) {
+    // console.log("Bridge offline");
   }
-}
-
-function updateMap(data) {
-  const lat = data.lat ?? HOME_LAT;
-  const lon = data.lon ?? HOME_LON;
-  const x = clamp(48 + ((lon - HOME_LON) / MAP_LON_SPAN) * 75, 8, 92);
-  const y = clamp(76 - ((lat - HOME_LAT) / MAP_LAT_SPAN) * 70, 8, 92);
-  const drone = document.getElementById("drone-marker");
-  drone.style.left = x + "%";
-  drone.style.top = y + "%";
-
-  const detection = document.getElementById("detection-marker");
-  if ((data.type || "").toLowerCase() === "detection") {
-    detection.style.display = "grid";
-  }
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function set(id, value, cls) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = value;
-  el.className = "telem-value " + (cls || "val-ok");
 }
 
 poll();
