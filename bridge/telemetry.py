@@ -5,8 +5,16 @@ import sys
 import threading
 import time
 
-from dotenv import load_dotenv
-from pymavlink import mavutil
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        return None
+
+try:
+    from pymavlink import mavutil
+except ImportError:
+    mavutil = None
 
 load_dotenv()
 
@@ -41,10 +49,18 @@ state = {
 _lock = threading.Lock()
 _master = None
 _threads_started = False
+_sim_active = False
+_sim_rtl = False
+_sim_land = False
+_sim_waypoints = []
+_sim_start_time = None
 
 
-def connect_sitl() -> mavutil.mavlink_connection:
+def connect_sitl():
     global _master
+    if mavutil is None:
+        print("[telemetry] ERROR: pymavlink is not installed. Use --laptop-demo or install requirements.")
+        sys.exit(1)
     print(f"[telemetry] Connecting to SITL at {SITL_UDP}...")
     try:
         _master = mavutil.mavlink_connection(SITL_UDP)
@@ -135,6 +151,107 @@ def start_telemetry_threads():
     threading.Thread(target=_log_loop, daemon=True).start()
     _threads_started = True
     print("[telemetry] Reader and logger threads started")
+
+
+def start_sim_telemetry_threads():
+    global _threads_started
+    if _threads_started:
+        return
+    with _lock:
+        state.update(
+            {
+                "battery_pct": 94,
+                "altitude_m": 0.0,
+                "gps_fix": True,
+                "esc_temp_c": 35,
+                "flight_mode": "GUIDED",
+                "armed": False,
+                "airspeed_ms": 0.0,
+                "groundspeed_ms": 0.0,
+                "current_wp": 0,
+                "total_wp": 0,
+                "timestamp": time.time(),
+            }
+        )
+    threading.Thread(target=_sim_loop, daemon=True).start()
+    threading.Thread(target=_log_loop, daemon=True).start()
+    _threads_started = True
+    print("[telemetry] Laptop simulation telemetry started")
+
+
+def set_sim_mission(waypoints: list):
+    global _sim_active, _sim_rtl, _sim_land, _sim_waypoints, _sim_start_time
+    with _lock:
+        _sim_waypoints = list(waypoints)
+        _sim_active = True
+        _sim_rtl = False
+        _sim_land = False
+        _sim_start_time = time.time()
+        state["armed"] = True
+        state["flight_mode"] = "AUTO"
+        state["current_wp"] = 0
+        state["total_wp"] = len(_sim_waypoints)
+        state["airspeed_ms"] = 8.0
+        state["groundspeed_ms"] = 8.0
+
+
+def sim_rtl():
+    global _sim_active, _sim_rtl
+    with _lock:
+        _sim_active = True
+        _sim_rtl = True
+        state["flight_mode"] = "RTL"
+
+
+def sim_land():
+    global _sim_active, _sim_land
+    with _lock:
+        _sim_active = True
+        _sim_land = True
+        state["flight_mode"] = "LAND"
+
+
+def _sim_loop():
+    global _sim_active
+    while True:
+        time.sleep(1)
+        with _lock:
+            now = time.time()
+            if _sim_active and _sim_start_time:
+                elapsed = now - _sim_start_time
+                if _sim_rtl:
+                    state["altitude_m"] = max(0.0, state["altitude_m"] - 5.5)
+                    state["lat"] += (float(os.getenv("HOME_LAT", "9.4142")) - state["lat"]) * 0.22
+                    state["lon"] += (float(os.getenv("HOME_LON", "76.5213")) - state["lon"]) * 0.22
+                    if state["altitude_m"] <= 0.2:
+                        state["armed"] = False
+                        _sim_active = False
+                elif _sim_land:
+                    state["altitude_m"] = max(0.0, state["altitude_m"] - 6.0)
+                    if state["altitude_m"] <= 0.2:
+                        state["armed"] = False
+                        _sim_active = False
+                else:
+                    waypoint_index = min(int(elapsed // 5), max(len(_sim_waypoints) - 1, 0))
+                    state["current_wp"] = waypoint_index + 1 if _sim_waypoints else 0
+                    if _sim_waypoints:
+                        target = _sim_waypoints[waypoint_index]
+                        state["lat"] += (float(target["lat"]) - state["lat"]) * 0.18
+                        state["lon"] += (float(target["lon"]) - state["lon"]) * 0.18
+                        target_alt = float(target["alt"])
+                        state["altitude_m"] += (target_alt - state["altitude_m"]) * 0.2
+                        if target.get("action") == "rtl" and elapsed > 5:
+                            state["flight_mode"] = "RTL"
+                    if elapsed > max(len(_sim_waypoints), 1) * 5 + 8:
+                        state["flight_mode"] = "RTL"
+                        state["altitude_m"] = max(0.0, state["altitude_m"] - 4.0)
+                state["battery_pct"] = max(22, state["battery_pct"] - 1)
+                state["esc_temp_c"] = min(48, state["esc_temp_c"] + (1 if state["armed"] else 0))
+                state["motor1_a"] = round(4.3 + random.uniform(-0.2, 0.2), 2)
+                state["motor2_a"] = round(4.2 + random.uniform(-0.2, 0.2), 2)
+                state["motor3_a"] = round(4.4 + random.uniform(-0.2, 0.2), 2)
+                state["motor4_a"] = round(4.3 + random.uniform(-0.2, 0.2), 2)
+            state["timestamp"] = now
 
 
 def get_state() -> dict:

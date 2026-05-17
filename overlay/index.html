@@ -74,6 +74,153 @@
     overflow-y: auto;
     max-height: 55vh;
   }
+  #command-panel {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  #command-input {
+    width: 100%;
+    min-height: 42px;
+    background: #020617;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  #command-input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+  }
+  #send-command {
+    min-width: 92px;
+    background: #0ea5e9;
+    border: 1px solid #38bdf8;
+    border-radius: 6px;
+    color: #03121f;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    padding: 0 14px;
+    text-transform: uppercase;
+  }
+  #send-command:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+  #quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .quick-action {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 8px 10px;
+    text-transform: uppercase;
+  }
+  .quick-action:hover,
+  #send-command:hover {
+    filter: brightness(1.12);
+  }
+  #mission-map {
+    position: relative;
+    height: 260px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    background:
+      linear-gradient(90deg, rgba(14, 165, 233, 0.28) 0 32%, transparent 32%),
+      linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      #0f172a;
+    background-size: auto, 40px 40px, 40px 40px, auto;
+  }
+  #mission-map::before {
+    content: "";
+    position: absolute;
+    left: 31%;
+    top: 0;
+    width: 7px;
+    height: 100%;
+    background: repeating-linear-gradient(
+      to bottom,
+      #94a3b8,
+      #94a3b8 10px,
+      #334155 10px,
+      #334155 18px
+    );
+    opacity: 0.85;
+  }
+  #mission-map::after {
+    content: "KUTTANAD FLOOD GRID";
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    color: #475569;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  .map-label {
+    position: absolute;
+    color: #94a3b8;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  #river-label { left: 16px; top: 14px; color: #7dd3fc; }
+  #embankment-label { left: 33%; top: 14px; color: #cbd5e1; }
+  .marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+  }
+  #home-marker {
+    left: 48%;
+    top: 76%;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #4ade80;
+    background: #14532d;
+    border-radius: 50%;
+  }
+  #drone-marker {
+    left: 48%;
+    top: 76%;
+    width: 22px;
+    height: 22px;
+    color: #0f172a;
+    background: #f8fafc;
+    border: 2px solid #38bdf8;
+    border-radius: 50%;
+    font-weight: bold;
+    transition: left 600ms ease, top 600ms ease;
+  }
+  #detection-marker {
+    left: 62%;
+    top: 40%;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #f87171;
+    background: #7f1d1d;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(248, 113, 113, 0.75);
+    display: none;
+  }
   #telemetry {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -120,7 +267,32 @@
   <span id="type-value" class="type-idle">IDLE</span>
 </div>
 
+<form id="command-panel">
+  <input
+    id="command-input"
+    autocomplete="off"
+    value="Search northern riverbank, start at 50 metres, expanding square pattern, avoid the concrete embankment on the west side"
+  >
+  <button id="send-command" type="submit">Send</button>
+</form>
+
+<div id="quick-actions">
+  <button class="quick-action" type="button" data-command="preflight">Preflight</button>
+  <button class="quick-action" type="button" data-command="detect">Detect</button>
+  <button class="quick-action" type="button" data-command="Skip eastern zone, civilians on ground">Replan</button>
+  <button class="quick-action" type="button" data-command="rtl">RTL</button>
+  <button class="quick-action" type="button" data-command="debrief">Debrief</button>
+</div>
+
 <div id="output-panel">Waiting for command...</div>
+
+<div id="mission-map">
+  <div class="map-label" id="river-label">Riverbank</div>
+  <div class="map-label" id="embankment-label">West embankment buffer</div>
+  <div class="marker" id="home-marker"></div>
+  <div class="marker" id="drone-marker">A</div>
+  <div class="marker" id="detection-marker"></div>
+</div>
 
 <div id="telemetry">
   <div class="telem-card"><div class="telem-label">Battery</div><div class="telem-value val-ok" id="t-bat">--%</div></div>
@@ -137,6 +309,48 @@
 
 <script>
 const POLL_INTERVAL = 500;
+const HOME_LAT = 9.4142;
+const HOME_LON = 76.5213;
+const MAP_LAT_SPAN = 0.0032;
+const MAP_LON_SPAN = 0.0032;
+const commandForm = document.getElementById("command-panel");
+const commandInput = document.getElementById("command-input");
+const sendButton = document.getElementById("send-command");
+
+commandForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await sendCommand(commandInput.value);
+});
+
+document.querySelectorAll(".quick-action").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const command = button.dataset.command || "";
+    commandInput.value = command;
+    await sendCommand(command);
+  });
+});
+
+async function sendCommand(command) {
+  const text = (command || "").trim();
+  if (!text) return;
+  sendButton.disabled = true;
+  try {
+    const response = await fetch("/command", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({command: text})
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      document.getElementById("output-panel").textContent = data.error || "Command rejected.";
+    }
+  } catch (error) {
+    document.getElementById("output-panel").textContent = "Cannot send command to SARGuard bridge.";
+  } finally {
+    sendButton.disabled = false;
+    commandInput.focus();
+  }
+}
 
 async function poll() {
   try {
@@ -159,11 +373,31 @@ async function poll() {
     set("t-wind", (data.wind_speed ?? 0) + " km/h", data.wind_speed < 25 ? "val-ok" : data.wind_speed < 35 ? "val-warn" : "val-crit");
     set("t-wp", (data.current_wp ?? 0) + " / " + (data.total_wp ?? 0), "val-ok");
     set("t-armed", data.armed ? "ARMED" : "DISARMED", data.armed ? "val-warn" : "val-ok");
+    updateMap(data);
     document.getElementById("footer").textContent = "Last update: " + new Date().toLocaleTimeString();
   } catch (error) {
     document.getElementById("output-panel").textContent =
       "Cannot reach SARGuard bridge at localhost:5000\nMake sure bridge.py is running.";
   }
+}
+
+function updateMap(data) {
+  const lat = data.lat ?? HOME_LAT;
+  const lon = data.lon ?? HOME_LON;
+  const x = clamp(48 + ((lon - HOME_LON) / MAP_LON_SPAN) * 75, 8, 92);
+  const y = clamp(76 - ((lat - HOME_LAT) / MAP_LAT_SPAN) * 70, 8, 92);
+  const drone = document.getElementById("drone-marker");
+  drone.style.left = x + "%";
+  drone.style.top = y + "%";
+
+  const detection = document.getElementById("detection-marker");
+  if ((data.type || "").toLowerCase() === "detection") {
+    detection.style.display = "grid";
+  }
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function set(id, value, cls) {

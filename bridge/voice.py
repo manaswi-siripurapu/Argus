@@ -4,7 +4,11 @@ import wave
 
 import pyaudio
 import whisper
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        return None
 
 load_dotenv()
 

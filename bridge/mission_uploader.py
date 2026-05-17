@@ -1,8 +1,20 @@
 import time
+import os
 
-from pymavlink import mavutil
+try:
+    from pymavlink import mavutil
+except ImportError:
+    mavutil = None
 
-from bridge.telemetry import get_master
+from bridge.telemetry import get_master, set_sim_mission, sim_land, sim_rtl
+
+
+def _env_true(name: str) -> bool:
+    return os.getenv(name, "false").lower() in {"1", "true", "yes", "on"}
+
+
+def _sim_drone_mode() -> bool:
+    return _env_true("SIM_DRONE_MODE") or _env_true("LAPTOP_DEMO_MODE")
 
 
 def _require_master():
@@ -13,6 +25,9 @@ def _require_master():
 
 
 def arm_and_takeoff(alt_m: float = 50.0):
+    if _sim_drone_mode():
+        print(f"[mission] SIM takeoff to {alt_m}m commanded")
+        return True
     master = _require_master()
     master.set_mode("GUIDED")
     time.sleep(1)
@@ -48,6 +63,12 @@ def arm_and_takeoff(alt_m: float = 50.0):
 
 
 def upload_mission(waypoints: list) -> bool:
+    if _sim_drone_mode():
+        set_sim_mission(waypoints)
+        print(f"[mission] SIM mission accepted: {len(waypoints)} waypoints")
+        print("[mission] SIM AUTO mode - virtual drone following mission")
+        return True
+
     master = _require_master()
     if not waypoints:
         print("[mission] No waypoints to upload")
@@ -114,12 +135,20 @@ def upload_mission(waypoints: list) -> bool:
 
 
 def rtl():
+    if _sim_drone_mode():
+        sim_rtl()
+        print("[mission] SIM RTL commanded")
+        return
     master = _require_master()
     master.set_mode("RTL")
     print("[mission] RTL commanded")
 
 
 def land():
+    if _sim_drone_mode():
+        sim_land()
+        print("[mission] SIM LAND commanded")
+        return
     master = _require_master()
     master.mav.command_long_send(
         master.target_system,
