@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SARGuard Overlay</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0e1a;
+    color: #e2e8f0;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  #header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 12px;
+  }
+  #dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  #brand {
+    font-weight: bold;
+    font-size: 14px;
+    color: #e2e8f0;
+  }
+  #type-label {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  #type-value {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .type-idle { background:#1e293b; color:#94a3b8; }
+  .type-preflight { background:#1e3a5f; color:#60a5fa; }
+  .type-mission { background:#1a3a2a; color:#4ade80; }
+  .type-detection { background:#3b1a1a; color:#f87171; }
+  .type-replan { background:#3b2a0a; color:#fbbf24; }
+  .type-debrief { background:#2a1a3b; color:#a78bfa; }
+  .type-system { background:#1e293b; color:#94a3b8; }
+  #output-panel {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+    min-height: 200px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.6;
+    color: #cbd5e1;
+    overflow-y: auto;
+    max-height: 55vh;
+  }
+  #telemetry {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .telem-card {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 8px 10px;
+    min-width: 0;
+  }
+  .telem-label {
+    font-size: 10px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .telem-value {
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+  }
+  .val-ok { color: #4ade80; }
+  .val-warn { color: #fbbf24; }
+  .val-crit { color: #f87171; }
+  #footer {
+    font-size: 10px;
+    color: #64748b;
+    text-align: right;
+  }
+  @media (max-width: 720px) {
+    #telemetry { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div id="header">
+  <div id="dot"></div>
+  <span id="brand">SARGuard</span>
+  <span id="type-label">STATUS</span>
+  <span id="type-value" class="type-idle">IDLE</span>
+</div>
+
+<div id="output-panel">Waiting for command...</div>
+
+<div id="telemetry">
+  <div class="telem-card"><div class="telem-label">Battery</div><div class="telem-value val-ok" id="t-bat">--%</div></div>
+  <div class="telem-card"><div class="telem-label">Altitude</div><div class="telem-value val-ok" id="t-alt">--m</div></div>
+  <div class="telem-card"><div class="telem-label">ESC Temp</div><div class="telem-value val-ok" id="t-esc">--C</div></div>
+  <div class="telem-card"><div class="telem-label">Mode</div><div class="telem-value val-ok" id="t-mode">--</div></div>
+  <div class="telem-card"><div class="telem-label">GPS</div><div class="telem-value val-ok" id="t-gps">--</div></div>
+  <div class="telem-card"><div class="telem-label">Wind</div><div class="telem-value val-ok" id="t-wind">-- km/h</div></div>
+  <div class="telem-card"><div class="telem-label">Waypoint</div><div class="telem-value val-ok" id="t-wp">-- / --</div></div>
+  <div class="telem-card"><div class="telem-label">Armed</div><div class="telem-value val-ok" id="t-armed">--</div></div>
+</div>
+
+<div id="footer">Last update: --</div>
+
+<script>
+const POLL_INTERVAL = 500;
+
+async function poll() {
+  try {
+    const response = await fetch("/status");
+    const data = await response.json();
+    document.getElementById("output-panel").textContent = data.text || "";
+
+    const typeValue = document.getElementById("type-value");
+    const type = (data.type || "idle").toLowerCase();
+    typeValue.textContent = type.toUpperCase();
+    typeValue.className = "type-" + type;
+
+    const battery = data.battery_pct ?? 0;
+    const esc = data.esc_temp_c ?? 0;
+    set("t-bat", battery + "%", battery > 40 ? "val-ok" : battery > 25 ? "val-warn" : "val-crit");
+    set("t-alt", (data.altitude_m ?? 0).toFixed(1) + "m", "val-ok");
+    set("t-esc", esc + "C", esc < 55 ? "val-ok" : esc < 70 ? "val-warn" : "val-crit");
+    set("t-mode", data.flight_mode || "--", "val-ok");
+    set("t-gps", data.gps_fix ? "3D FIX" : "NO FIX", data.gps_fix ? "val-ok" : "val-crit");
+    set("t-wind", (data.wind_speed ?? 0) + " km/h", data.wind_speed < 25 ? "val-ok" : data.wind_speed < 35 ? "val-warn" : "val-crit");
+    set("t-wp", (data.current_wp ?? 0) + " / " + (data.total_wp ?? 0), "val-ok");
+    set("t-armed", data.armed ? "ARMED" : "DISARMED", data.armed ? "val-warn" : "val-ok");
+    document.getElementById("footer").textContent = "Last update: " + new Date().toLocaleTimeString();
+  } catch (error) {
+    document.getElementById("output-panel").textContent =
+      "Cannot reach SARGuard bridge at localhost:5000\nMake sure bridge.py is running.";
+  }
+}
+
+function set(id, value, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+  el.className = "telem-value " + (cls || "val-ok");
+}
+
+poll();
+setInterval(poll, POLL_INTERVAL);
+</script>
+</body>
+</html>
